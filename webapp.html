@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, sans-serif;
+  background: var(--tg-bg-color, #f0f0f0);
+  color: var(--tg-text-color, #333);
+  padding: 12px;
+  padding-bottom: 80px;
+}
+.search-box {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 15px;
+  margin-bottom: 12px;
+  background: var(--tg-secondary-bg-color, #fff);
+  color: var(--tg-text-color, #333);
+}
+.oil-list { display: flex; flex-direction: column; gap: 6px; }
+.oil-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--tg-secondary-bg-color, #fff);
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+.oil-name { font-size: 15px; flex: 1; }
+.oil-pv { font-size: 13px; color: #888; margin-right: 8px; }
+.qty-input {
+  width: 60px;
+  padding: 6px 8px;
+  text-align: center;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 15px;
+  background: var(--tg-bg-color, #f9f9f9);
+  color: var(--tg-text-color, #333);
+}
+.summary {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--tg-secondary-bg-color, #fff);
+  border-top: 1px solid #ddd;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.total-text { font-size: 16px; font-weight: bold; }
+.submit-btn {
+  background: var(--tg-button-color, #2aabee);
+  color: var(--tg-button-text-color, #fff);
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.no-results { text-align: center; padding: 24px; color: #999; }
+</style>
+</head>
+<body>
+
+<div class="search-box">
+  <input type="text" id="search" class="search-box" placeholder="Поиск масла..." oninput="filterOils()">
+</div>
+
+<div class="oil-list" id="oilList"></div>
+
+<div class="summary">
+  <span class="total-text" id="totalText">Всего: 0 PV</span>
+  <button class="submit-btn" id="submitBtn" onclick="submitData()">Готово</button>
+</div>
+
+<script>
+const OILS = [
+  {"name":"базилик","pv":36},{"name":"бергамот","pv":44},{"name":"берёза","pv":49},
+  {"name":"чёрная ель","pv":23},{"name":"голубая пижма","pv":89},{"name":"кардамон","pv":34},
+  {"name":"кассия","pv":21},{"name":"кедр","pv":17},{"name":"сельдерей","pv":42},
+  {"name":"кинза","pv":30},{"name":"корица","pv":39},{"name":"цитронелла","pv":23},
+  {"name":"шалфей мускатный","pv":43},{"name":"гвоздика","pv":22},{"name":"копайба","pv":43},
+  {"name":"копайба touch","pv":30},{"name":"кориандр","pv":29},{"name":"кипарис","pv":21},
+  {"name":"дугласова пихта","pv":26},{"name":"фенхель","pv":20},{"name":"ладан","pv":82},
+  {"name":"ладан touch","pv":57},{"name":"герань","pv":55},{"name":"имбирь","pv":57},
+  {"name":"грейпфрут","pv":22},{"name":"зелёный мандарин","pv":33},{"name":"гваяковое дерево","pv":22},
+  {"name":"бессмертник touch","pv":57},{"name":"бессмертник","pv":80},{"name":"жасмин","pv":107},
+  {"name":"жасмин touch","pv":52},{"name":"можжевельник","pv":25},{"name":"лаванда","pv":31},
+  {"name":"лаванда touch","pv":22},{"name":"лимон","pv":17},{"name":"лимонный эвкалипт","pv":18},
+  {"name":"лемонграсс","pv":16},{"name":"лайм","pv":18},{"name":"мадагаскарская ваниль","pv":44},
+  {"name":"майоран","pv":26},{"name":"мелисса","pv":95},{"name":"мирра","pv":68},
+  {"name":"нероли touch","pv":51},{"name":"орегано","pv":31},{"name":"орегано touch","pv":21},
+  {"name":"пачули","pv":36},{"name":"перечная мята","pv":28},{"name":"перечная мята touch","pv":22},
+  {"name":"перечная мята в гранулах","pv":19},{"name":"петитгрейн","pv":30},
+  {"name":"розовый перец","pv":25},{"name":"римская ромашка","pv":57},{"name":"роза touch","pv":74},
+  {"name":"розмарин","pv":22},{"name":"гавайское сандаловое дерево","pv":71},
+  {"name":"сибирская пихта","pv":23},{"name":"испанский шалфей","pv":32},
+  {"name":"садовая мята","pv":34},{"name":"нард","pv":57},{"name":"мандарин","pv":18},
+  {"name":"чайное дерево","pv":28},{"name":"чайное дерево touch","pv":19},
+  {"name":"тимьян","pv":37},{"name":"куркума","pv":37},{"name":"тулси","pv":34},
+  {"name":"ветивер","pv":66},{"name":"ветивер touch","pv":44},{"name":"дикий апельсин","pv":14},
+  {"name":"туя","pv":26},{"name":"иланг-иланг","pv":48}
+];
+
+function renderOils(filter) {
+  const list = document.getElementById('oilList');
+  list.innerHTML = '';
+  const filtered = OILS.filter(o =>
+    !filter || o.name.toLowerCase().includes(filter.toLowerCase())
+  );
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="no-results">Ничего не найдено</div>';
+    return;
+  }
+  filtered.forEach(oil => {
+    const div = document.createElement('div');
+    div.className = 'oil-item';
+    div.innerHTML =
+      '<span class="oil-name">' + oil.name + '</span>' +
+      '<span class="oil-pv">' + oil.pv + ' PV</span>' +
+      '<input type="number" min="0" value="0" class="qty-input" ' +
+      'data-name="' + oil.name + '" data-pv="' + oil.pv + '" ' +
+      'oninput="updateTotal()">';
+    list.appendChild(div);
+  });
+}
+
+function filterOils() {
+  const q = document.getElementById('search').value;
+  renderOils(q);
+}
+
+function updateTotal() {
+  let total = 0;
+  document.querySelectorAll('.qty-input').forEach(inp => {
+    const qty = parseInt(inp.value) || 0;
+    total += qty * parseInt(inp.dataset.pv);
+  });
+  document.getElementById('totalText').textContent = 'Всего: ' + total + ' PV';
+}
+
+function submitData() {
+  const selected = [];
+  document.querySelectorAll('.qty-input').forEach(inp => {
+    const qty = parseInt(inp.value) || 0;
+    if (qty > 0) {
+      selected.push({
+        name: inp.dataset.name,
+        pv: parseInt(inp.dataset.pv),
+        qty: qty
+      });
+    }
+  });
+  if (selected.length === 0) {
+    alert('Выберите хотя бы одно масло');
+    return;
+  }
+  Telegram.WebApp.sendData(JSON.stringify(selected));
+  Telegram.WebApp.close();
+}
+
+// Инициализация
+Telegram.WebApp.ready();
+Telegram.WebApp.expand();
+renderOils('');
+</script>
+</body>
+</html>
