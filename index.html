@@ -1,177 +1,174 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: -apple-system, sans-serif;
-  background: var(--tg-bg-color, #f0f0f0);
-  color: var(--tg-text-color, #333);
-  padding: 12px;
-  padding-bottom: 80px;
-}
-.search-box {
-  width: 100%;
-  padding: 10px 14px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  font-size: 15px;
-  margin-bottom: 12px;
-  background: var(--tg-secondary-bg-color, #fff);
-  color: var(--tg-text-color, #333);
-}
-.oil-list { display: flex; flex-direction: column; gap: 6px; }
-.oil-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  background: var(--tg-secondary-bg-color, #fff);
-  border-radius: 8px;
-  border: 1px solid #eee;
-}
-.oil-name { font-size: 15px; flex: 1; }
-.oil-pv { font-size: 13px; color: #888; margin-right: 8px; }
-.qty-input {
-  width: 60px;
-  padding: 6px 8px;
-  text-align: center;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  font-size: 15px;
-  background: var(--tg-bg-color, #f9f9f9);
-  color: var(--tg-text-color, #333);
-}
-.summary {
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  background: var(--tg-secondary-bg-color, #fff);
-  border-top: 1px solid #ddd;
-  padding: 12px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.total-text { font-size: 16px; font-weight: bold; }
-.submit-btn {
-  background: var(--tg-button-color, #2aabee);
-  color: var(--tg-button-text-color, #fff);
-  border: none;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-}
-.no-results { text-align: center; padding: 24px; color: #999; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Масла</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 16px;
+            color: var(--tg-theme-text-color, #222);
+            background: var(--tg-theme-bg-color, #f5f5f5);
+        }
+        #search {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            margin-bottom: 12px;
+            outline: none;
+        }
+        #search:focus { border-color: #4a90d9; }
+        .oil-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            margin-bottom: 6px;
+            background: var(--tg-theme-secondary-bg-color, #fff);
+            border-radius: 10px;
+        }
+        .oil-name { font-size: 15px; flex: 1; }
+        .oil-pv { font-size: 13px; color: #888; margin-left: 8px; }
+        .qty-controls { display: flex; align-items: center; gap: 6px; }
+        .qty-btn {
+            width: 32px; height: 32px;
+            border: none; border-radius: 8px;
+            background: #4a90d9; color: #fff;
+            font-size: 18px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .qty-btn:active { opacity: 0.7; }
+        .qty-btn.minus { background: #e05a5a; }
+        .qty-val {
+            min-width: 32px; text-align: center;
+            font-size: 15px; font-weight: 600;
+        }
+        #summary {
+            position: sticky; bottom: 0;
+            background: var(--tg-theme-bg-color, #f5f5f5);
+            padding: 12px 0; margin-top: 8px;
+        }
+        #total { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+        #submit {
+            width: 100%;
+            padding: 14px;
+            border: none; border-radius: 12px;
+            background: var(--tg-theme-button-color, #4a90d9);
+            color: var(--tg-theme-button-text-color, #fff);
+            font-size: 16px; font-weight: 600;
+            cursor: pointer;
+        }
+        #submit:active { opacity: 0.8; }
+        .hidden { display: none; }
+    </style>
 </head>
 <body>
+    <input type="text" id="search" placeholder="Поиск масла..." oninput="filterOils()">
+    <div id="oil-list"></div>
+    <div id="summary">
+        <div id="total">Выбрано: 0 PV</div>
+        <button id="submit" onclick="submitData()">Готово</button>
+    </div>
 
-<div class="search-box">
-  <input type="text" id="search" class="search-box" placeholder="Поиск масла..." oninput="filterOils()">
-</div>
+    <script>
+        const PROD = {
+            'базилик': 36, 'бергамот': 44, 'берёза': 49, 'чёрная ель': 23,
+            'голубая пижма': 89, 'кардамон': 34, 'кассия': 21, 'кедр': 17,
+            'сельдерей': 42, 'кинза': 30, 'корица': 39, 'цитронелла': 23,
+            'шалфей мускатный': 43, 'гвоздика': 22, 'копайба': 43,
+            'копайба touch': 30, 'кориандр': 29, 'кипарис': 21,
+            'дугласова пихта': 26, 'фенхель': 20, 'ладан': 82,
+            'ладан touch': 57, 'герань': 55, 'имбирь': 57,
+            'грейпфрут': 22, 'зелёный мандарин': 33, 'гваяковое дерево': 22,
+            'бессмертник touch': 57, 'бессмертник': 80, 'жасмин': 107,
+            'жасмин touch': 52, 'можжевельник': 25, 'лаванда': 31,
+            'лаванда touch': 22, 'лимон': 17, 'лимонный эвкалипт': 18,
+            'лемонграсс': 16, 'лайм': 18, 'мадагаскарская ваниль': 44,
+            'майоран': 26, 'мелисса': 95, 'мирра': 68,
+            'нероли touch': 51, 'орегано': 31, 'орегано touch': 21,
+            'пачули': 36, 'перечная мята': 28, 'перечная мята touch': 22,
+            'перечная мята в гранулах': 19, 'петитгрейн': 30,
+            'розовый перец': 25, 'римская ромашка': 57, 'роза touch': 74,
+            'розмарин': 22, 'гавайское сандаловое дерево': 71,
+            'сибирская пихта': 23, 'испанский шалфей': 32,
+            'садовая мята': 34, 'нард': 57, 'мандарин': 18,
+            'чайное дерево': 28, 'чайное дерево touch': 19,
+            'тимьян': 37, 'куркума': 37, 'тулси': 34,
+            'ветивер': 66, 'ветивер touch': 44, 'дикий апельсин': 14,
+            'туя': 26, 'иланг-иланг': 48
+        };
 
-<div class="oil-list" id="oilList"></div>
+        const quantities = {};
+        const allNames = Object.keys(PROD).sort();
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
 
-<div class="summary">
-  <span class="total-text" id="totalText">Всего: 0 PV</span>
-  <button class="submit-btn" id="submitBtn" onclick="submitData()">Готово</button>
-</div>
+        function renderList(filter) {
+            const list = document.getElementById('oil-list');
+            list.innerHTML = '';
+            for (const name of allNames) {
+                if (filter && !name.toLowerCase().includes(filter.toLowerCase())) continue;
+                const pv = PROD[name];
+                const qty = quantities[name] || 0;
+                const item = document.createElement('div');
+                item.className = 'oil-item';
+                item.innerHTML = `
+                    <span class="oil-name">${name}<span class="oil-pv">(${pv} PV)</span></span>
+                    <div class="qty-controls">
+                        <button class="qty-btn minus" onclick="changeQty('${name}', -1)">−</button>
+                        <span class="qty-val">${qty}</span>
+                        <button class="qty-btn" onclick="changeQty('${name}', 1)">+</button>
+                    </div>
+                `;
+                list.appendChild(item);
+            }
+        }
 
-<script>
-const OILS = [
-  {"name":"базилик","pv":36},{"name":"бергамот","pv":44},{"name":"берёза","pv":49},
-  {"name":"чёрная ель","pv":23},{"name":"голубая пижма","pv":89},{"name":"кардамон","pv":34},
-  {"name":"кассия","pv":21},{"name":"кедр","pv":17},{"name":"сельдерей","pv":42},
-  {"name":"кинза","pv":30},{"name":"корица","pv":39},{"name":"цитронелла","pv":23},
-  {"name":"шалфей мускатный","pv":43},{"name":"гвоздика","pv":22},{"name":"копайба","pv":43},
-  {"name":"копайба touch","pv":30},{"name":"кориандр","pv":29},{"name":"кипарис","pv":21},
-  {"name":"дугласова пихта","pv":26},{"name":"фенхель","pv":20},{"name":"ладан","pv":82},
-  {"name":"ладан touch","pv":57},{"name":"герань","pv":55},{"name":"имбирь","pv":57},
-  {"name":"грейпфрут","pv":22},{"name":"зелёный мандарин","pv":33},{"name":"гваяковое дерево","pv":22},
-  {"name":"бессмертник touch","pv":57},{"name":"бессмертник","pv":80},{"name":"жасмин","pv":107},
-  {"name":"жасмин touch","pv":52},{"name":"можжевельник","pv":25},{"name":"лаванда","pv":31},
-  {"name":"лаванда touch","pv":22},{"name":"лимон","pv":17},{"name":"лимонный эвкалипт","pv":18},
-  {"name":"лемонграсс","pv":16},{"name":"лайм","pv":18},{"name":"мадагаскарская ваниль","pv":44},
-  {"name":"майоран","pv":26},{"name":"мелисса","pv":95},{"name":"мирра","pv":68},
-  {"name":"нероли touch","pv":51},{"name":"орегано","pv":31},{"name":"орегано touch","pv":21},
-  {"name":"пачули","pv":36},{"name":"перечная мята","pv":28},{"name":"перечная мята touch","pv":22},
-  {"name":"перечная мята в гранулах","pv":19},{"name":"петитгрейн","pv":30},
-  {"name":"розовый перец","pv":25},{"name":"римская ромашка","pv":57},{"name":"роза touch","pv":74},
-  {"name":"розмарин","pv":22},{"name":"гавайское сандаловое дерево","pv":71},
-  {"name":"сибирская пихта","pv":23},{"name":"испанский шалфей","pv":32},
-  {"name":"садовая мята","pv":34},{"name":"нард","pv":57},{"name":"мандарин","pv":18},
-  {"name":"чайное дерево","pv":28},{"name":"чайное дерево touch","pv":19},
-  {"name":"тимьян","pv":37},{"name":"куркума","pv":37},{"name":"тулси","pv":34},
-  {"name":"ветивер","pv":66},{"name":"ветивер touch","pv":44},{"name":"дикий апельсин","pv":14},
-  {"name":"туя","pv":26},{"name":"иланг-иланг","pv":48}
-];
+        function changeQty(name, delta) {
+            const cur = quantities[name] || 0;
+            const next = Math.max(0, cur + delta);
+            quantities[name] = next;
+            renderList(document.getElementById('search').value);
+            updateTotal();
+        }
 
-function renderOils(filter) {
-  const list = document.getElementById('oilList');
-  list.innerHTML = '';
-  const filtered = OILS.filter(o =>
-    !filter || o.name.toLowerCase().includes(filter.toLowerCase())
-  );
-  if (filtered.length === 0) {
-    list.innerHTML = '<div class="no-results">Ничего не найдено</div>';
-    return;
-  }
-  filtered.forEach(oil => {
-    const div = document.createElement('div');
-    div.className = 'oil-item';
-    div.innerHTML =
-      '<span class="oil-name">' + oil.name + '</span>' +
-      '<span class="oil-pv">' + oil.pv + ' PV</span>' +
-      '<input type="number" min="0" value="0" class="qty-input" ' +
-      'data-name="' + oil.name + '" data-pv="' + oil.pv + '" ' +
-      'oninput="updateTotal()">';
-    list.appendChild(div);
-  });
-}
+        function updateTotal() {
+            let total = 0;
+            for (const [name, qty] of Object.entries(quantities)) {
+                if (qty > 0) total += PROD[name] * qty;
+            }
+            document.getElementById('total').textContent = `Выбрано: ${total} PV`;
+        }
 
-function filterOils() {
-  const q = document.getElementById('search').value;
-  renderOils(q);
-}
+        function filterOils() {
+            renderList(document.getElementById('search').value);
+        }
 
-function updateTotal() {
-  let total = 0;
-  document.querySelectorAll('.qty-input').forEach(inp => {
-    const qty = parseInt(inp.value) || 0;
-    total += qty * parseInt(inp.dataset.pv);
-  });
-  document.getElementById('totalText').textContent = 'Всего: ' + total + ' PV';
-}
+        function submitData() {
+            const selected = {};
+            for (const [name, qty] of Object.entries(quantities)) {
+                if (qty > 0) selected[name] = qty;
+            }
 
-function submitData() {
-  const selected = [];
-  document.querySelectorAll('.qty-input').forEach(inp => {
-    const qty = parseInt(inp.value) || 0;
-    if (qty > 0) {
-      selected.push({
-        name: inp.dataset.name,
-        pv: parseInt(inp.dataset.pv),
-        qty: qty
-      });
-    }
-  });
-  if (selected.length === 0) {
-    alert('Выберите хотя бы одно масло');
-    return;
-  }
-  Telegram.WebApp.sendData(JSON.stringify(selected));
-  Telegram.WebApp.close();
-}
+            if (Object.keys(selected).length === 0) {
+                tg.HapticFeedback.notificationOccurred('error');
+                return;
+            }
 
-// Инициализация
-Telegram.WebApp.ready();
-Telegram.WebApp.expand();
-renderOils('');
-</script>
+            tg.HapticFeedback.notificationOccurred('success');
+
+            // КЛЮЧЕВОЙ МОМЕНТ: sendData работает только при открытии
+            // через inline-кнопку с web_app
+            tg.sendData(JSON.stringify(selected));
+        }
+
+        renderList('');
+    </script>
 </body>
 </html>
